@@ -269,24 +269,51 @@ def geocode_city_name(city_name):
     """Validate and geocode city name using Open-Meteo Geocoding API"""
     try:
         url = "https://geocoding-api.open-meteo.com/v1/search"
-        params = {
-            "name": city_name,
-            "count": 1,
-            "language": "en"
-        }
-        response = requests.get(url, params=params, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            results = data.get("results", [])
-            if results:
-                result = results[0]
-                return {
-                    "name": result.get("name", city_name),
-                    "lat": result.get("latitude"),
-                    "lon": result.get("longitude"),
-                    "country": result.get("country", ""),
-                    "admin1": result.get("admin1", "")  # State/Province
-                }
+        
+        # Try multiple search variations for better results
+        search_queries = [
+            city_name,  # Original query
+            f"{city_name}, Los Angeles",  # Add Los Angeles
+            f"{city_name}, California",  # Add California
+            f"{city_name}, USA",  # Add USA
+        ]
+        
+        for query in search_queries:
+            params = {
+                "name": query,
+                "count": 5,  # Get more results to find better matches
+                "language": "en"
+            }
+            response = requests.get(url, params=params, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get("results", [])
+                if results:
+                    # Prefer results in California/USA
+                    for result in results:
+                        country = result.get("country", "").upper()
+                        admin1 = result.get("admin1", "").upper()
+                        name = result.get("name", "").upper()
+                        
+                        # Check if it's in California or USA
+                        if "CALIFORNIA" in admin1 or "CA" in admin1 or "USA" in country or "UNITED STATES" in country:
+                            return {
+                                "name": result.get("name", city_name),
+                                "lat": result.get("latitude"),
+                                "lon": result.get("longitude"),
+                                "country": result.get("country", ""),
+                                "admin1": result.get("admin1", "")  # State/Province
+                            }
+                    
+                    # If no California/USA match, return first result
+                    result = results[0]
+                    return {
+                        "name": result.get("name", city_name),
+                        "lat": result.get("latitude"),
+                        "lon": result.get("longitude"),
+                        "country": result.get("country", ""),
+                        "admin1": result.get("admin1", "")  # State/Province
+                    }
     except Exception as e:
         pass
     return None
