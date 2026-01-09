@@ -550,6 +550,12 @@ TRANSLATIONS = {
         "unassign": "Unassign",
         "location": "Location",
         "no_description": "No description",
+        "find_coordinates": "Find Coordinates",
+        "coordinates_found": "Coordinates found:",
+        "coordinates_not_found": "Could not find coordinates for this place. Please enter coordinates manually.",
+        "places_without_coordinates": "Places Without Coordinates",
+        "geocode_place": "Find Location",
+        "enter_place_name": "Enter place name to find coordinates",
         # To-Do
         "todo_header": "✅ To-Do List",
         "new_todo_item": "New to-do item",
@@ -750,6 +756,12 @@ TRANSLATIONS = {
         "unassign": "Usun przypisanie",
         "location": "Lokalizacja",
         "no_description": "Brak opisu",
+        "find_coordinates": "Znajdz Wspolrzedne",
+        "coordinates_found": "Znalezione wspolrzedne:",
+        "coordinates_not_found": "Nie mozna znalezc wspolrzednych dla tego miejsca. Wprowadz wspolrzedne recznie.",
+        "places_without_coordinates": "Miejsca Bez Wspolrzednych",
+        "geocode_place": "Znajdz Lokalizacje",
+        "enter_place_name": "Wprowadz nazwe miejsca, aby znalezc wspolrzedne",
         # To-Do
         "todo_header": "✅ Lista Zadan",
         "new_todo_item": "Nowe zadanie",
@@ -1015,6 +1027,10 @@ def show_map(lang="en"):
     elif filter_day is not None:
         filtered_places = [p for p in places if p.get("day") == filter_day]
     
+    # Separate places with and without coordinates
+    places_with_coords = [p for p in filtered_places if p.get("lat") is not None and p.get("lon") is not None]
+    places_without_coords = [p for p in filtered_places if p.get("lat") is None or p.get("lon") is None]
+    
     # Create map centered on the trip area
     m = folium.Map(
         location=[35.0, -117.0],
@@ -1022,8 +1038,8 @@ def show_map(lang="en"):
         tiles='OpenStreetMap'
     )
     
-    # Add markers for each filtered place
-    for place in filtered_places:
+    # Add markers for each filtered place with coordinates
+    for place in places_with_coords:
         # Determine marker color
         if place.get("completed", False):
             color = "green"
@@ -1069,8 +1085,57 @@ def show_map(lang="en"):
         ).add_to(m)
     
     # Display map
-    st.info(t("showing_places", lang).format(len(filtered_places), len(places)))
+    st.info(t("showing_places", lang).format(len(places_with_coords), len(filtered_places)))
     map_data = st_folium(m, width=1200, height=600)
+    
+    # Show places without coordinates
+    if places_without_coords:
+        st.divider()
+        st.subheader(t("places_without_coordinates", lang))
+        st.info(f"These {len(places_without_coords)} place(s) don't have coordinates and can't be shown on the map. Use the 'Find Location' button to add coordinates.")
+        
+        for place in places_without_coords:
+            with st.expander(f"📍 {place['name']} ({place.get('type', 'attraction')})"):
+                st.write(f"**{t('description', lang)}:** {place.get('description', '')}")
+                
+                # Geocode button
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    geocode_name = st.text_input(
+                        t("enter_place_name", lang),
+                        value=place['name'],
+                        key=f"geocode_name_{place['id']}"
+                    )
+                with col2:
+                    if st.button(t("geocode_place", lang), key=f"geocode_{place['id']}"):
+                        with st.spinner("Searching for location..."):
+                            city_info = geocode_city_name(geocode_name.strip())
+                            if city_info:
+                                place["lat"] = city_info["lat"]
+                                place["lon"] = city_info["lon"]
+                                save_places(places_data)
+                                st.success(f"✅ {t('coordinates_found', lang)} {city_info['lat']:.4f}, {city_info['lon']:.4f}")
+                                st.rerun()
+                            else:
+                                st.error(t("coordinates_not_found", lang))
+                
+                # Manual coordinate input
+                st.markdown("**Or enter coordinates manually:**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    manual_lat = st.number_input("Latitude", value=place.get("lat") or 0.0, format="%.6f", key=f"manual_lat_{place['id']}")
+                with col2:
+                    manual_lon = st.number_input("Longitude", value=place.get("lon") or 0.0, format="%.6f", key=f"manual_lon_{place['id']}")
+                
+                if st.button("Save Coordinates", key=f"save_coords_{place['id']}"):
+                    if manual_lat != 0.0 or manual_lon != 0.0:
+                        place["lat"] = manual_lat
+                        place["lon"] = manual_lon
+                        save_places(places_data)
+                        st.success("Coordinates saved!")
+                        st.rerun()
+                    else:
+                        st.warning("Please enter valid coordinates (not 0,0)")
     
     # Place management section
     st.divider()
@@ -1083,8 +1148,35 @@ def show_map(lang="en"):
         with st.form("add_place_form"):
             place_name = st.text_input(t("place_name", lang))
             place_type = st.selectbox(t("place_type", lang), [t("attraction", lang), t("restaurant", lang)])
-            place_lat = st.number_input(t("latitude", lang), value=34.0522, format="%.6f")
-            place_lon = st.number_input(t("longitude", lang), value=-118.2437, format="%.6f")
+            
+            # Coordinates section with geocoding option
+            st.markdown("**Coordinates (optional):**")
+            use_geocode = st.checkbox("Find coordinates from place name", value=False, key="use_geocode_new")
+            
+            if use_geocode and place_name:
+                if st.button(t("find_coordinates", lang), key="find_coords_new"):
+                    with st.spinner("Searching for location..."):
+                        city_info = geocode_city_name(place_name.strip())
+                        if city_info:
+                            st.session_state.new_place_lat = city_info["lat"]
+                            st.session_state.new_place_lon = city_info["lon"]
+                            st.success(f"✅ {t('coordinates_found', lang)} {city_info['lat']:.4f}, {city_info['lon']:.4f}")
+                        else:
+                            st.error(t("coordinates_not_found", lang))
+            
+            place_lat = st.number_input(
+                t("latitude", lang) + f" ({t('optional', lang)})", 
+                value=st.session_state.get("new_place_lat", 34.0522), 
+                format="%.6f",
+                key="new_place_lat_input"
+            )
+            place_lon = st.number_input(
+                t("longitude", lang) + f" ({t('optional', lang)})", 
+                value=st.session_state.get("new_place_lon", -118.2437), 
+                format="%.6f",
+                key="new_place_lon_input"
+            )
+            
             place_desc = st.text_area(t("description", lang))
             default_date = datetime.now().date()
             place_day_input = st.date_input(f"{t('date', lang)} ({t('optional', lang)})", value=default_date, key="new_place_day")
@@ -1093,6 +1185,11 @@ def show_map(lang="en"):
             
             submitted = st.form_submit_button(t("add", lang) + " " + t("place_name", lang).split()[0] if " " in t("place_name", lang) else t("add", lang))
             if submitted and place_name:
+                # Clear session state after use
+                if "new_place_lat" in st.session_state:
+                    del st.session_state.new_place_lat
+                if "new_place_lon" in st.session_state:
+                    del st.session_state.new_place_lon
                 new_id = max([p.get("id", 0) for p in places] + [0]) + 1
                 photo_path = None
                 
@@ -1104,8 +1201,8 @@ def show_map(lang="en"):
                     "id": new_id,
                     "name": place_name,
                     "type": place_type,
-                    "lat": place_lat,
-                    "lon": place_lon,
+                    "lat": place_lat if place_lat != 0.0 else None,
+                    "lon": place_lon if place_lon != 0.0 else None,
                     "description": place_desc,
                     "day": place_day if place_day else None,
                     "photo": photo_path,
@@ -1153,7 +1250,22 @@ def show_map(lang="en"):
                         display_photo_in_streamlit(photo_path)
                     
                     st.write(f"**{t('description', lang)}:** {place.get('description', '')}")
-                    st.write(f"**{t('location', lang)}:** {place['lat']}, {place['lon']}")
+                    if place.get("lat") is not None and place.get("lon") is not None:
+                        st.write(f"**{t('location', lang)}:** {place['lat']}, {place['lon']}")
+                    else:
+                        st.warning("⚠️ No coordinates - this place won't appear on the map")
+                        # Quick geocode option
+                        if st.button(t("find_coordinates", lang), key=f"quick_geocode_{place['id']}"):
+                            with st.spinner("Searching..."):
+                                city_info = geocode_city_name(place['name'])
+                                if city_info:
+                                    place["lat"] = city_info["lat"]
+                                    place["lon"] = city_info["lon"]
+                                    save_places(places_data)
+                                    st.success(f"✅ {t('coordinates_found', lang)}")
+                                    st.rerun()
+                                else:
+                                    st.error(t("coordinates_not_found", lang))
                     
                     # Date selector
                     current_day = place.get("day")
