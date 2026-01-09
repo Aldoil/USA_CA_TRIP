@@ -1,6 +1,6 @@
 # ✈️ USA Trip Planner
 
-A comprehensive, all-in-one trip planning application for your February trip to Los Angeles, Las Vegas, Palm Springs, Grand Canyon, and San Diego. Perfect for planning and managing your trip on mobile devices during your travels.
+A comprehensive, all-in-one trip planning application for US trip. Perfect for planning and managing your trip on mobile devices during your travels.
 
 ## 🌟 Features
 
