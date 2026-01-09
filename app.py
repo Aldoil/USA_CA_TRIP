@@ -840,8 +840,7 @@ TRANSLATIONS = {
         "total_expenses": "Total Expenses",
         "number_expenses": "Number of Expenses",
         "expense_desc": "Description",
-        "amount_usd": "Amount (USD)",
-        "amount_pln": "Amount (PLN)",
+        "amount": "Amount",
         "currency": "Currency",
         "usd": "USD",
         "pln": "PLN",
@@ -1062,8 +1061,7 @@ TRANSLATIONS = {
         "total_expenses": "Laczne Wydatki",
         "number_expenses": "Liczba Wydatkow",
         "expense_desc": "Opis",
-        "amount_usd": "Kwota (USD)",
-        "amount_pln": "Kwota (PLN)",
+        "amount": "Kwota",
         "currency": "Waluta",
         "usd": "USD",
         "pln": "PLN",
@@ -2157,8 +2155,7 @@ def show_budget(lang="en"):
         with col2:
             expense_currency = st.selectbox(t("currency", lang), [t("usd", lang), t("pln", lang)], key="expense_currency")
             currency_code = "USD" if expense_currency == t("usd", lang) else "PLN"
-            amount_label = t("amount_usd", lang) if currency_code == "USD" else t("amount_pln", lang)
-            expense_amount = st.number_input(amount_label, min_value=0.0, step=10.0, key="expense_amount")
+            expense_amount = st.number_input(t("amount", lang), min_value=0.0, step=10.0, key="expense_amount")
         with col3:
             # Store categories in English, display in selected language
             category_options_en = ["Food", "Transportation", "Accommodation", "Activities", "Shopping", "Other"]
