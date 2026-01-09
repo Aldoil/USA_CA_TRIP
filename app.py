@@ -577,6 +577,10 @@ TRANSLATIONS = {
         "to": "To",
         "airline": "Airline",
         "flight_number": "Flight Number",
+        "landing_time": "Landing Time",
+        "duration": "Duration",
+        "duration_hours": "hours",
+        "duration_minutes": "minutes",
         "your_flights": "Your Flights",
         "delete_flight": "Delete Flight",
         "no_flights": "No flights added yet. Add your first flight above!",
@@ -783,6 +787,10 @@ TRANSLATIONS = {
         "to": "Do",
         "airline": "Linia Lotnicza",
         "flight_number": "Numer Lotu",
+        "landing_time": "Czas Ladowania",
+        "duration": "Czas Trwania",
+        "duration_hours": "godzin",
+        "duration_minutes": "minut",
         "your_flights": "Twoje Loty",
         "delete_flight": "Usun Lot",
         "no_flights": "Nie dodano jeszcze lotow. Dodaj pierwszy lot powyzej!",
@@ -1457,16 +1465,36 @@ def show_trip_info(lang="en"):
             flight_time = st.time_input(t("time", lang))
             airline = st.text_input(t("airline", lang))
             flight_num = st.text_input(t("flight_number", lang))
-        with col2:
             from_airport = st.text_input(t("from", lang))
+        with col2:
             to_airport = st.text_input(t("to", lang))
             flight_type = st.selectbox(t("flight_type", lang), [t("outbound", lang), t("return", lang), t("domestic", lang)])
+            landing_time = st.time_input(t("landing_time", lang), value=datetime.now().time())
+        
+        # Duration input
+        st.markdown("**" + t("duration", lang) + ":**")
+        dur_col1, dur_col2 = st.columns(2)
+        with dur_col1:
+            duration_hours = st.number_input(t("duration_hours", lang), min_value=0, max_value=24, value=0, step=1)
+        with dur_col2:
+            duration_minutes = st.number_input(t("duration_minutes", lang), min_value=0, max_value=59, value=0, step=1)
         
         if st.form_submit_button(t("add_flight", lang)):
+            # Format duration as "Xh Ym" or just "Xh" or "Ym"
+            duration_str = ""
+            if duration_hours > 0 and duration_minutes > 0:
+                duration_str = f"{duration_hours}h {duration_minutes}m"
+            elif duration_hours > 0:
+                duration_str = f"{duration_hours}h"
+            elif duration_minutes > 0:
+                duration_str = f"{duration_minutes}m"
+            
             flights.append({
                 "id": max([f.get("id", 0) for f in flights] + [0]) + 1,
                 "date": flight_date.strftime("%Y-%m-%d"),
                 "time": flight_time.strftime("%H:%M"),
+                "landing_time": landing_time.strftime("%H:%M"),
+                "duration": duration_str,
                 "airline": airline,
                 "flight_number": flight_num,
                 "from": from_airport,
@@ -1495,6 +1523,10 @@ def show_trip_info(lang="en"):
                 with col1:
                     st.write(f"**{t('date', lang)}:** {flight.get('date', 'N/A')}")
                     st.write(f"**{t('time', lang)}:** {flight.get('time', 'N/A')}")
+                    if flight.get('landing_time'):
+                        st.write(f"**{t('landing_time', lang)}:** {flight.get('landing_time', 'N/A')}")
+                    if flight.get('duration'):
+                        st.write(f"**{t('duration', lang)}:** {flight.get('duration', 'N/A')}")
                     st.write(f"**{t('type', lang)}:** {flight.get('type', 'N/A')}")
                 with col2:
                     st.write(f"**{t('airline', lang)}:** {flight.get('airline', 'N/A')}")
