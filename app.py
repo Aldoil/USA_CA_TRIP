@@ -265,55 +265,97 @@ def get_city_from_coordinates(lat, lon):
         pass
     return None
 
-def geocode_city_name(city_name):
-    """Validate and geocode city name using Open-Meteo Geocoding API"""
+def geocode_place_name(place_name):
+    """Geocode place name using Nominatim (OpenStreetMap) - better for specific places"""
     try:
-        url = "https://geocoding-api.open-meteo.com/v1/search"
-        
-        # Try multiple search variations for better results
+        # Try multiple search variations
         search_queries = [
-            city_name,  # Original query
-            f"{city_name}, Los Angeles",  # Add Los Angeles
-            f"{city_name}, California",  # Add California
-            f"{city_name}, USA",  # Add USA
+            place_name,  # Original query
+            f"{place_name}, Los Angeles, California",  # Add location context
+            f"{place_name}, California, USA",  # Add state and country
         ]
         
         for query in search_queries:
+            url = "https://nominatim.openstreetmap.org/search"
             params = {
-                "name": query,
-                "count": 5,  # Get more results to find better matches
-                "language": "en"
+                "q": query,
+                "format": "json",
+                "limit": 5,
+                "addressdetails": 1,
+                "countrycodes": "us"  # Prioritize US results
             }
-            response = requests.get(url, params=params, timeout=5)
+            headers = {
+                "User-Agent": "USA_Trip_Planner/1.0"  # Required by Nominatim
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
             if response.status_code == 200:
-                data = response.json()
-                results = data.get("results", [])
+                results = response.json()
                 if results:
-                    # Prefer results in California/USA
+                    # Prefer results in California
                     for result in results:
-                        country = result.get("country", "").upper()
-                        admin1 = result.get("admin1", "").upper()
-                        name = result.get("name", "").upper()
+                        address = result.get("address", {})
+                        state = address.get("state", "").upper()
+                        country = address.get("country", "").upper()
                         
-                        # Check if it's in California or USA
-                        if "CALIFORNIA" in admin1 or "CA" in admin1 or "USA" in country or "UNITED STATES" in country:
+                        # Check if it's in California
+                        if "CALIFORNIA" in state or "CA" in state or country == "UNITED STATES":
                             return {
-                                "name": result.get("name", city_name),
-                                "lat": result.get("latitude"),
-                                "lon": result.get("longitude"),
-                                "country": result.get("country", ""),
-                                "admin1": result.get("admin1", "")  # State/Province
+                                "name": result.get("display_name", place_name).split(",")[0],  # Get first part of display name
+                                "lat": float(result.get("lat", 0)),
+                                "lon": float(result.get("lon", 0)),
+                                "country": address.get("country", ""),
+                                "admin1": address.get("state", "")
                             }
                     
-                    # If no California/USA match, return first result
+                    # If no California match, return first US result
+                    for result in results:
+                        address = result.get("address", {})
+                        country = address.get("country", "").upper()
+                        if country == "UNITED STATES":
+                            return {
+                                "name": result.get("display_name", place_name).split(",")[0],
+                                "lat": float(result.get("lat", 0)),
+                                "lon": float(result.get("lon", 0)),
+                                "country": address.get("country", ""),
+                                "admin1": address.get("state", "")
+                            }
+                    
+                    # Fallback to first result
                     result = results[0]
                     return {
-                        "name": result.get("name", city_name),
-                        "lat": result.get("latitude"),
-                        "lon": result.get("longitude"),
-                        "country": result.get("country", ""),
-                        "admin1": result.get("admin1", "")  # State/Province
+                        "name": result.get("display_name", place_name).split(",")[0],
+                        "lat": float(result.get("lat", 0)),
+                        "lon": float(result.get("lon", 0)),
+                        "country": result.get("address", {}).get("country", ""),
+                        "admin1": result.get("address", {}).get("state", "")
                     }
+    except Exception as e:
+        pass
+    return None
+
+def geocode_city_name(city_name):
+    """Validate and geocode city name using Open-Meteo Geocoding API (for weather)"""
+    try:
+        url = "https://geocoding-api.open-meteo.com/v1/search"
+        params = {
+            "name": city_name,
+            "count": 1,
+            "language": "en"
+        }
+        response = requests.get(url, params=params, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get("results", [])
+            if results:
+                result = results[0]
+                return {
+                    "name": result.get("name", city_name),
+                    "lat": result.get("latitude"),
+                    "lon": result.get("longitude"),
+                    "country": result.get("country", ""),
+                    "admin1": result.get("admin1", "")  # State/Province
+                }
     except Exception as e:
         pass
     return None
@@ -1158,7 +1200,7 @@ def show_map(lang="en"):
                 with col2:
                     if st.button(t("geocode_place", lang), key=f"geocode_{place['id']}"):
                         with st.spinner("Searching for location..."):
-                            city_info = geocode_city_name(geocode_name.strip())
+                            city_info = geocode_place_name(geocode_name.strip())
                             if city_info:
                                 place["lat"] = city_info["lat"]
                                 place["lon"] = city_info["lon"]
@@ -1200,7 +1242,7 @@ def show_map(lang="en"):
         if place_name_for_geocode:
             if st.button(t("find_coordinates", lang), key="find_coords_new"):
                 with st.spinner("Searching for location..."):
-                    city_info = geocode_city_name(place_name_for_geocode.strip())
+                    city_info = geocode_place_name(place_name_for_geocode.strip())
                     if city_info:
                         st.session_state.new_place_lat = city_info["lat"]
                         st.session_state.new_place_lon = city_info["lon"]
@@ -1311,7 +1353,7 @@ def show_map(lang="en"):
                         # Quick geocode option
                         if st.button(t("find_coordinates", lang), key=f"quick_geocode_{place['id']}"):
                             with st.spinner("Searching..."):
-                                city_info = geocode_city_name(place['name'])
+                                city_info = geocode_place_name(place['name'])
                                 if city_info:
                                     place["lat"] = city_info["lat"]
                                     place["lon"] = city_info["lon"]
