@@ -921,7 +921,7 @@ def main():
     )
     if selected_lang != lang:
         st.session_state.language = selected_lang
-        st.experimental_rerun()
+        st.rerun()
     
     # Sidebar navigation
     st.sidebar.markdown("---")
@@ -999,7 +999,7 @@ def show_map(lang="en"):
                 if st.button(btn_label, key=btn_key, use_container_width=True,
                            type="primary" if is_selected else "secondary"):
                     st.session_state.selected_day_filter = btn_value
-                    st.experimental_rerun()
+                    st.rerun()
     
     # Determine which date to filter by
     filter_day = None
@@ -1115,7 +1115,7 @@ def show_map(lang="en"):
                 places_data["places"] = places
                 save_places(places_data)
                 st.success(f"{t('add', lang)} {place_name}!")
-                st.experimental_rerun()
+                st.rerun()
     
     with col2:
         st.markdown(f"### {t('existing_places', lang)}")
@@ -1180,7 +1180,7 @@ def show_map(lang="en"):
                     if new_day != current_day:
                         place["day"] = new_day
                         save_places(places_data)
-                        st.experimental_rerun()
+                        st.rerun()
                     
                     # Photo upload/update
                     st.markdown(f"**{t('update_photo', lang)}:**")
@@ -1196,7 +1196,7 @@ def show_map(lang="en"):
                                 place["photo"] = photo_path
                                 save_places(places_data)
                                 st.success(t("update_photo", lang) + "!")
-                                st.experimental_rerun()
+                                st.rerun()
                             else:
                                 st.warning(t("please_select_photo", lang))
                     
@@ -1208,7 +1208,7 @@ def show_map(lang="en"):
                     if completed != place.get("completed", False):
                         place["completed"] = completed
                         save_places(places_data)
-                        st.experimental_rerun()
+                        st.rerun()
                     
                     if st.button(f"{t('delete', lang)} {place['name']}", key=f"delete_{place['id']}"):
                         # Delete photo file if exists
@@ -1220,7 +1220,7 @@ def show_map(lang="en"):
                         places.remove(place)
                         places_data["places"] = places
                         save_places(places_data)
-                        st.experimental_rerun()
+                        st.rerun()
         else:
             st.info(t("no_places", lang))
 
@@ -1248,7 +1248,7 @@ def show_todo(lang="en"):
             })
             todo_data["items"] = items
             save_todo(todo_data)
-            st.experimental_rerun()
+            st.rerun()
     
     st.divider()
     
@@ -1283,13 +1283,13 @@ def show_todo(lang="en"):
                     items.remove(item)
                     todo_data["items"] = items
                     save_todo(todo_data)
-                    st.experimental_rerun()
+                    st.rerun()
             
             if completed != item.get("completed", False):
                 item["completed"] = completed
                 todo_data["items"] = items
                 save_todo(todo_data)
-                st.experimental_rerun()
+                st.rerun()
     else:
         st.info(t("todo_empty", lang))
 
@@ -1364,7 +1364,7 @@ def show_trip_info(lang="en"):
             trip_info["flights"] = flights
             save_trip_info(trip_info)
             st.success(f"{t('add', lang)} {flight_type} {t('flights', lang).lower()}!")
-            st.experimental_rerun()
+            st.rerun()
     
     # Display flights
     if flights:
@@ -1393,7 +1393,7 @@ def show_trip_info(lang="en"):
                     flights.remove(flight)
                     trip_info["flights"] = flights
                     save_trip_info(trip_info)
-                    st.experimental_rerun()
+                    st.rerun()
     else:
         st.info(t("no_flights", lang))
     
@@ -1431,7 +1431,7 @@ def show_trip_info(lang="en"):
                 trip_info["hotels"] = hotels
                 save_trip_info(trip_info)
                 st.success(f"{t('add', lang)} {hotel_name}!")
-                st.experimental_rerun()
+                st.rerun()
     
     # Display hotels
     if hotels:
@@ -1449,7 +1449,7 @@ def show_trip_info(lang="en"):
                     hotels.remove(hotel)
                     trip_info["hotels"] = hotels
                     save_trip_info(trip_info)
-                    st.experimental_rerun()
+                    st.rerun()
     else:
         st.info(t("no_hotels", lang))
 
@@ -1487,7 +1487,7 @@ def show_before_trip(lang="en"):
                     })
                     packing_data[person] = items
                     save_packing(packing_data)
-                    st.experimental_rerun()
+                    st.rerun()
             
             st.divider()
             
@@ -1507,13 +1507,13 @@ def show_before_trip(lang="en"):
                             items.remove(item)
                             packing_data[person] = items
                             save_packing(packing_data)
-                            st.experimental_rerun()
+                            st.rerun()
                     
                     if packed != item.get("packed", False):
                         item["packed"] = packed
                         packing_data[person] = items
                         save_packing(packing_data)
-                        st.experimental_rerun()
+                        st.rerun()
                 
                 # Progress
                 packed_count = sum(1 for item in items if item.get("packed", False))
@@ -1580,7 +1580,7 @@ def show_budget(lang="en"):
                 budget_data["expenses"] = expenses
                 save_budget(budget_data)
                 st.success(t("add_expense", lang) + "!")
-                st.experimental_rerun()
+                st.rerun()
     
     st.divider()
     
@@ -1710,7 +1710,7 @@ def show_budget(lang="en"):
                         expenses.remove(exp)
                         budget_data["expenses"] = expenses
                         save_budget(budget_data)
-                        st.experimental_rerun()
+                        st.rerun()
     else:
         st.info(t("no_expenses_recorded", lang))
 
@@ -1736,7 +1736,7 @@ def show_notes(lang="en"):
                 notes_data["notes"] = notes
                 save_notes(notes_data)
                 st.success(t("add_note", lang) + "!")
-                st.experimental_rerun()
+                st.rerun()
     
     st.divider()
     
@@ -1749,7 +1749,7 @@ def show_notes(lang="en"):
                     notes.remove(note)
                     notes_data["notes"] = notes
                     save_notes(notes_data)
-                    st.experimental_rerun()
+                    st.rerun()
     else:
         st.info(t("no_notes", lang))
 
@@ -1777,7 +1777,7 @@ def show_users(lang="en"):
                         save_packing(packing_data)
                     
                     st.success(f"{t('add', lang)} {new_user}!")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.warning(f"{new_user} {t('already_in_list', lang)}")
             else:
@@ -1804,7 +1804,7 @@ def show_users(lang="en"):
                         del packing_data[user]
                         save_packing(packing_data)
                     
-                    st.experimental_rerun()
+                    st.rerun()
     else:
         st.info(t("no_users", lang))
         st.markdown(f"**{t('default_users', lang).split(':')[0]}:** {t('default_users', lang).split(':', 1)[1] if ':' in t('default_users', lang) else ''}")
@@ -1913,7 +1913,7 @@ def show_weather(lang="en"):
                             with st.spinner("Fetching weather data..."):
                                 weather_data = get_weather_from_api(city_info["lat"], city_info["lon"], selected_date)
                                 st.session_state.weather_data = weather_data
-                                st.experimental_rerun()
+                                st.rerun()
                     else:
                         st.error(t("city_not_found", lang))
                         selected_location = None
