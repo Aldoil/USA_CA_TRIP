@@ -15,6 +15,7 @@ ENV/
 # Data files (optional - remove if you want to track data in git)
 data/
 *.json
+.streamlit/secrets.toml
 
 # IDE
 .vscode/

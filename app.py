@@ -20,6 +20,63 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Password protection - using Streamlit secrets
+# Password is stored in Streamlit Cloud secrets, not in code
+def get_password():
+    """Get password from Streamlit secrets or environment variable"""
+    try:
+        # Try Streamlit secrets first (for Streamlit Cloud)
+        if hasattr(st, "secrets") and "password" in st.secrets:
+            return st.secrets["password"]
+    except:
+        pass
+    
+    # Fallback to environment variable (for local development)
+    env_password = os.getenv("APP_PASSWORD")
+    if env_password:
+        return env_password
+    
+    # No password set - app won't work (this is intentional for security)
+    st.error("⚠️ Password not configured. Please set it in Streamlit secrets or APP_PASSWORD environment variable.")
+    st.stop()
+    return None
+
+def check_password():
+    """Returns `True` if the user had the correct password."""
+    
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        correct_password = get_password()
+        if st.session_state["password"] == correct_password:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store password
+        else:
+            st.session_state["password_correct"] = False
+    
+    if "password_correct" not in st.session_state:
+        # First run, show input for password
+        st.text_input(
+            "Enter password to access the app", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        st.info("👆 Enter the password to access the trip planner")
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password not correct, show input + error
+        st.text_input(
+            "Enter password to access the app", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        st.error("❌ Password incorrect. Please try again.")
+        return False
+    else:
+        # Password correct
+        return True
+
 # Data file paths
 DATA_DIR = "data"
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
@@ -998,6 +1055,10 @@ init_default_data()
 
 # Main app
 def main():
+    # Password protection
+    if not check_password():
+        st.stop()  # Stop execution if password is incorrect
+    
     # Initialize language in session state
     if "language" not in st.session_state:
         st.session_state.language = "en"
