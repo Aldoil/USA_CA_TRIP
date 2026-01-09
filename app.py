@@ -44,34 +44,36 @@ def get_password():
 def check_password():
     """Returns `True` if the user had the correct password."""
     
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        correct_password = get_password()
-        if st.session_state["password"] == correct_password:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store password
-        else:
-            st.session_state["password_correct"] = False
-    
     if "password_correct" not in st.session_state:
-        # First run, show input for password
-        st.text_input(
-            "Enter password to access the app", 
-            type="password", 
-            on_change=password_entered, 
-            key="password"
-        )
+        st.session_state["password_correct"] = False
+    
+    if not st.session_state["password_correct"]:
+        # Show password input form
+        st.markdown("### 🔒 Password Required")
         st.info("👆 Enter the password to access the trip planner")
-        return False
-    elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error
-        st.text_input(
-            "Enter password to access the app", 
-            type="password", 
-            on_change=password_entered, 
-            key="password"
-        )
-        st.error("❌ Password incorrect. Please try again.")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            password_input = st.text_input(
+                "Enter password to access the app", 
+                type="password", 
+                key="password_input",
+                label_visibility="collapsed",
+                placeholder="Enter password..."
+            )
+        with col2:
+            submit_clicked = st.button("🔓 Submit", key="password_submit", use_container_width=True)
+        
+        if submit_clicked:
+            correct_password = get_password()
+            if correct_password and password_input == correct_password:
+                st.session_state["password_correct"] = True
+                if "password_input" in st.session_state:
+                    del st.session_state["password_input"]
+                st.rerun()
+            else:
+                st.error("❌ Password incorrect. Please try again.")
+        
         return False
     else:
         # Password correct
