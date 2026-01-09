@@ -636,8 +636,12 @@ TRANSLATIONS = {
         "keep_notes": "Keep notes, ideas, and reminders for your trip",
         "note_title": "Note Title",
         "note_content": "Note Content",
+        "note_link": "Link (optional)",
         "add_note": "Add Note",
         "no_notes": "No notes yet. Add your first note above!",
+        "edit_flight": "Edit Flight",
+        "save_changes": "Save Changes",
+        "place_link": "Link (optional)",
         # Users
         "users_header": "👥 Manage Users",
         "users_description": "Add or remove users. This list is used in Budget Tracker and Before Trip sections.",
@@ -846,8 +850,12 @@ TRANSLATIONS = {
         "keep_notes": "Przechowuj notatki, pomysly i przypomnienia do swojej podrozy",
         "note_title": "Tytul Notatki",
         "note_content": "Tresc Notatki",
+        "note_link": "Link (opcjonalnie)",
         "add_note": "Dodaj Notatke",
         "no_notes": "Brak notatek. Dodaj pierwsza notatke powyzej!",
+        "edit_flight": "Edytuj Lot",
+        "save_changes": "Zapisz Zmiany",
+        "place_link": "Link (opcjonalnie)",
         # Users
         "users_header": "👥 Zarzadzaj Uzytkownikami",
         "users_description": "Dodaj lub usun uzytkownikow. Ta lista jest uzywana w Sledzeniu Wydatkow i Przed Podroza.",
@@ -1074,6 +1082,11 @@ def show_map(lang="en"):
             except:
                 day_info = f'<p><strong>Date:</strong> {place.get("day")}</p>'
         
+        # Link info
+        link_html = ""
+        if place.get('link'):
+            link_html = f'<p><strong>Link:</strong> <a href="{place["link"]}" target="_blank">{place["link"]}</a></p>'
+        
         # Create popup content
         popup_html = f"""
         <div style="width: 300px;">
@@ -1082,6 +1095,7 @@ def show_map(lang="en"):
             <p><strong>Type:</strong> {place.get('type', 'attraction').title()}</p>
             {day_info}
             <p>{place.get('description', 'No description available')}</p>
+            {link_html}
         </div>
         """
         
@@ -1153,25 +1167,26 @@ def show_map(lang="en"):
     
     with col1:
         st.markdown(f"### {t('add_new_place', lang)}")
+        
+        # Geocoding section (outside form)
+        place_name_for_geocode = st.text_input("Place name for coordinates lookup", key="geocode_place_name", placeholder="Enter place name to find coordinates")
+        if place_name_for_geocode:
+            if st.button(t("find_coordinates", lang), key="find_coords_new"):
+                with st.spinner("Searching for location..."):
+                    city_info = geocode_city_name(place_name_for_geocode.strip())
+                    if city_info:
+                        st.session_state.new_place_lat = city_info["lat"]
+                        st.session_state.new_place_lon = city_info["lon"]
+                        st.success(f"✅ {t('coordinates_found', lang)} {city_info['lat']:.4f}, {city_info['lon']:.4f}")
+                    else:
+                        st.error(t("coordinates_not_found", lang))
+        
         with st.form("add_place_form"):
             place_name = st.text_input(t("place_name", lang))
             place_type = st.selectbox(t("place_type", lang), [t("attraction", lang), t("restaurant", lang)])
             
-            # Coordinates section with geocoding option
+            # Coordinates section
             st.markdown("**Coordinates (optional):**")
-            use_geocode = st.checkbox("Find coordinates from place name", value=False, key="use_geocode_new")
-            
-            if use_geocode and place_name:
-                if st.button(t("find_coordinates", lang), key="find_coords_new"):
-                    with st.spinner("Searching for location..."):
-                        city_info = geocode_city_name(place_name.strip())
-                        if city_info:
-                            st.session_state.new_place_lat = city_info["lat"]
-                            st.session_state.new_place_lon = city_info["lon"]
-                            st.success(f"✅ {t('coordinates_found', lang)} {city_info['lat']:.4f}, {city_info['lon']:.4f}")
-                        else:
-                            st.error(t("coordinates_not_found", lang))
-            
             place_lat = st.number_input(
                 t("latitude", lang) + f" ({t('optional', lang)})", 
                 value=st.session_state.get("new_place_lat", 34.0522), 
@@ -1186,6 +1201,7 @@ def show_map(lang="en"):
             )
             
             place_desc = st.text_area(t("description", lang))
+            place_link = st.text_input(t("place_link", lang), placeholder="https://...")
             default_date = datetime.now().date()
             place_day_input = st.date_input(f"{t('date', lang)} ({t('optional', lang)})", value=default_date, key="new_place_day")
             place_day = place_day_input.strftime("%Y-%m-%d") if place_day_input else None
@@ -1212,6 +1228,7 @@ def show_map(lang="en"):
                     "lat": place_lat if place_lat != 0.0 else None,
                     "lon": place_lon if place_lon != 0.0 else None,
                     "description": place_desc,
+                    "link": place_link if place_link else None,
                     "day": place_day if place_day else None,
                     "photo": photo_path,
                     "completed": False
@@ -1258,6 +1275,8 @@ def show_map(lang="en"):
                         display_photo_in_streamlit(photo_path)
                     
                     st.write(f"**{t('description', lang)}:** {place.get('description', '')}")
+                    if place.get('link'):
+                        st.markdown(f"🔗 [Link]({place['link']})")
                     if place.get("lat") is not None and place.get("lon") is not None:
                         st.write(f"**{t('location', lang)}:** {place['lat']}, {place['lon']}")
                     else:
@@ -1462,13 +1481,18 @@ def show_trip_info(lang="en"):
         col1, col2 = st.columns(2)
         with col1:
             flight_date = st.date_input(t("date", lang))
-            flight_time = st.time_input(t("time", lang))
             airline = st.text_input(t("airline", lang))
             flight_num = st.text_input(t("flight_number", lang))
             from_airport = st.text_input(t("from", lang))
         with col2:
             to_airport = st.text_input(t("to", lang))
             flight_type = st.selectbox(t("flight_type", lang), [t("outbound", lang), t("return", lang), t("domestic", lang)])
+        
+        # Time and landing time in the same row
+        time_col1, time_col2 = st.columns(2)
+        with time_col1:
+            flight_time = st.time_input(t("time", lang))
+        with time_col2:
             landing_time = st.time_input(t("landing_time", lang), value=datetime.now().time())
         
         # Duration input
@@ -1518,26 +1542,150 @@ def show_trip_info(lang="en"):
         for flight in sorted_flights:
             if not isinstance(flight, dict):
                 continue
+            
+            # Check if this flight is being edited
+            edit_key = f"edit_flight_{flight['id']}"
+            is_editing = st.session_state.get(edit_key, False)
+            
             with st.expander(f"✈️ {flight.get('type', t('flights', lang))}: {flight.get('from', 'N/A')} → {flight.get('to', 'N/A')} ({flight.get('date', 'N/A')})"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write(f"**{t('date', lang)}:** {flight.get('date', 'N/A')}")
-                    st.write(f"**{t('time', lang)}:** {flight.get('time', 'N/A')}")
-                    if flight.get('landing_time'):
-                        st.write(f"**{t('landing_time', lang)}:** {flight.get('landing_time', 'N/A')}")
-                    if flight.get('duration'):
-                        st.write(f"**{t('duration', lang)}:** {flight.get('duration', 'N/A')}")
-                    st.write(f"**{t('type', lang)}:** {flight.get('type', 'N/A')}")
-                with col2:
-                    st.write(f"**{t('airline', lang)}:** {flight.get('airline', 'N/A')}")
-                    st.write(f"**{t('flight_number', lang)}:** {flight.get('flight_number', 'N/A')}")
-                    st.write(f"**{t('route', lang)}:** {flight.get('from', 'N/A')} → {flight.get('to', 'N/A')}")
-                
-                if st.button(t("delete_flight", lang), key=f"del_flight_{flight['id']}"):
-                    flights.remove(flight)
-                    trip_info["flights"] = flights
-                    save_trip_info(trip_info)
-                    st.rerun()
+                if is_editing:
+                    # Edit form
+                    with st.form(f"edit_flight_form_{flight['id']}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            # Parse existing date
+                            current_date = datetime.now().date()
+                            if flight.get('date'):
+                                try:
+                                    current_date = datetime.strptime(flight.get('date'), "%Y-%m-%d").date()
+                                except:
+                                    pass
+                            flight_date = st.date_input(t("date", lang), value=current_date, key=f"edit_date_{flight['id']}")
+                            
+                            # Parse existing times
+                            current_time = datetime.now().time()
+                            current_landing = datetime.now().time()
+                            if flight.get('time'):
+                                try:
+                                    time_parts = flight.get('time').split(':')
+                                    current_time = datetime.now().replace(hour=int(time_parts[0]), minute=int(time_parts[1])).time()
+                                except:
+                                    pass
+                            if flight.get('landing_time'):
+                                try:
+                                    landing_parts = flight.get('landing_time').split(':')
+                                    current_landing = datetime.now().replace(hour=int(landing_parts[0]), minute=int(landing_parts[1])).time()
+                                except:
+                                    pass
+                            
+                            airline = st.text_input(t("airline", lang), value=flight.get('airline', ''), key=f"edit_airline_{flight['id']}")
+                            flight_num = st.text_input(t("flight_number", lang), value=flight.get('flight_number', ''), key=f"edit_num_{flight['id']}")
+                            from_airport = st.text_input(t("from", lang), value=flight.get('from', ''), key=f"edit_from_{flight['id']}")
+                        with col2:
+                            to_airport = st.text_input(t("to", lang), value=flight.get('to', ''), key=f"edit_to_{flight['id']}")
+                            flight_type_options = [t("outbound", lang), t("return", lang), t("domestic", lang)]
+                            current_type = flight.get('type', t("outbound", lang))
+                            try:
+                                type_index = flight_type_options.index(current_type) if current_type in flight_type_options else 0
+                            except:
+                                type_index = 0
+                            flight_type = st.selectbox(
+                                t("flight_type", lang), 
+                                flight_type_options,
+                                index=type_index,
+                                key=f"edit_type_{flight['id']}"
+                            )
+                        
+                        # Time and landing time in the same row
+                        time_col1, time_col2 = st.columns(2)
+                        with time_col1:
+                            flight_time = st.time_input(t("time", lang), value=current_time, key=f"edit_time_{flight['id']}")
+                        with time_col2:
+                            landing_time = st.time_input(t("landing_time", lang), value=current_landing, key=f"edit_landing_{flight['id']}")
+                        
+                        # Duration input
+                        duration_hours = 0
+                        duration_minutes = 0
+                        if flight.get('duration'):
+                            dur_str = flight.get('duration', '')
+                            if 'h' in dur_str:
+                                try:
+                                    duration_hours = int(dur_str.split('h')[0])
+                                except:
+                                    pass
+                            if 'm' in dur_str:
+                                try:
+                                    dur_min_part = dur_str.split('m')[0].split()[-1] if ' ' in dur_str else dur_str.split('m')[0]
+                                    duration_minutes = int(dur_min_part)
+                                except:
+                                    pass
+                        
+                        st.markdown("**" + t("duration", lang) + ":**")
+                        dur_col1, dur_col2 = st.columns(2)
+                        with dur_col1:
+                            duration_hours = st.number_input(t("duration_hours", lang), min_value=0, max_value=24, value=duration_hours, step=1, key=f"edit_dur_h_{flight['id']}")
+                        with dur_col2:
+                            duration_minutes = st.number_input(t("duration_minutes", lang), min_value=0, max_value=59, value=duration_minutes, step=1, key=f"edit_dur_m_{flight['id']}")
+                        
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            if st.form_submit_button(t("save_changes", lang)):
+                                # Format duration
+                                duration_str = ""
+                                if duration_hours > 0 and duration_minutes > 0:
+                                    duration_str = f"{duration_hours}h {duration_minutes}m"
+                                elif duration_hours > 0:
+                                    duration_str = f"{duration_hours}h"
+                                elif duration_minutes > 0:
+                                    duration_str = f"{duration_minutes}m"
+                                
+                                flight.update({
+                                    "date": flight_date.strftime("%Y-%m-%d"),
+                                    "time": flight_time.strftime("%H:%M"),
+                                    "landing_time": landing_time.strftime("%H:%M"),
+                                    "duration": duration_str,
+                                    "airline": airline,
+                                    "flight_number": flight_num,
+                                    "from": from_airport,
+                                    "to": to_airport,
+                                    "type": flight_type
+                                })
+                                trip_info["flights"] = flights
+                                save_trip_info(trip_info)
+                                st.session_state[edit_key] = False
+                                st.success(t("save_changes", lang) + "!")
+                                st.rerun()
+                        with col_btn2:
+                            if st.form_submit_button(t("cancel", lang)):
+                                st.session_state[edit_key] = False
+                                st.rerun()
+                else:
+                    # Display mode
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**{t('date', lang)}:** {flight.get('date', 'N/A')}")
+                        st.write(f"**{t('time', lang)}:** {flight.get('time', 'N/A')}")
+                        if flight.get('landing_time'):
+                            st.write(f"**{t('landing_time', lang)}:** {flight.get('landing_time', 'N/A')}")
+                        if flight.get('duration'):
+                            st.write(f"**{t('duration', lang)}:** {flight.get('duration', 'N/A')}")
+                        st.write(f"**{t('type', lang)}:** {flight.get('type', 'N/A')}")
+                    with col2:
+                        st.write(f"**{t('airline', lang)}:** {flight.get('airline', 'N/A')}")
+                        st.write(f"**{t('flight_number', lang)}:** {flight.get('flight_number', 'N/A')}")
+                        st.write(f"**{t('route', lang)}:** {flight.get('from', 'N/A')} → {flight.get('to', 'N/A')}")
+                    
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button(t("edit_flight", lang), key=f"btn_edit_{flight['id']}"):
+                            st.session_state[edit_key] = True
+                            st.rerun()
+                    with col_btn2:
+                        if st.button(t("delete_flight", lang), key=f"del_flight_{flight['id']}"):
+                            flights.remove(flight)
+                            trip_info["flights"] = flights
+                            save_trip_info(trip_info)
+                            st.rerun()
     else:
         st.info(t("no_flights", lang))
     
@@ -1869,12 +2017,14 @@ def show_notes(lang="en"):
     with st.form("add_note_form"):
         note_title = st.text_input(t("note_title", lang))
         note_content = st.text_area(t("note_content", lang), height=150)
+        note_link = st.text_input(t("note_link", lang), placeholder="https://...")
         if st.form_submit_button(t("add_note", lang)):
             if note_title and note_content:
                 notes.append({
                     "id": max([n.get("id", 0) for n in notes] + [0]) + 1,
                     "title": note_title,
                     "content": note_content,
+                    "link": note_link if note_link else None,
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M")
                 })
                 notes_data["notes"] = notes
@@ -1889,6 +2039,8 @@ def show_notes(lang="en"):
         for note in sorted(notes, key=lambda x: x.get("date", ""), reverse=True):
             with st.expander(f"📌 {note['title']} - {note.get('date', 'N/A')}"):
                 st.write(note['content'])
+                if note.get('link'):
+                    st.markdown(f"🔗 [Link]({note['link']})")
                 if st.button(f"{t('delete', lang)} {t('notes', lang).split()[0] if ' ' in t('notes', lang) else t('notes', lang)}", key=f"del_note_{note['id']}"):
                     notes.remove(note)
                     notes_data["notes"] = notes
