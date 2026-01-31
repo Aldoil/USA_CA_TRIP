@@ -12,6 +12,21 @@ import altair as alt
 import math
 import requests
 
+# Database layer: use Supabase when configured (Streamlit Cloud); else local files
+try:
+    from db import use_database, db_load, db_save, db_load_photo, db_save_photo
+except ImportError:
+    def use_database():
+        return False
+    def db_load(key):
+        return None
+    def db_save(key, value):
+        return False
+    def db_load_photo(place_id):
+        return None
+    def db_save_photo(place_id, filename, base64_data):
+        return False
+
 # Page configuration
 st.set_page_config(
     page_title="USA CA Trip Planner",
@@ -96,210 +111,212 @@ EXCHANGE_RATE_FILE = os.path.join(DATA_DIR, "exchange_rates.json")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(PHOTOS_DIR, exist_ok=True)
 
-# Initialize default data
+# Default data structures (used for both DB and file init)
+DEFAULT_PLACES = {
+    "places": [
+        {"id": 1, "name": "Hollywood Walk of Fame", "type": "attraction", "lat": 34.1016, "lon": -118.3269,
+         "description": "Famous sidewalk with stars honoring celebrities", "photo": None, "day": None, "completed": False},
+        {"id": 2, "name": "Griffith Observatory", "type": "attraction", "lat": 34.1183, "lon": -118.3003,
+         "description": "Iconic observatory with stunning views of LA", "photo": None, "day": None, "completed": False},
+        {"id": 3, "name": "Las Vegas Strip", "type": "attraction", "lat": 36.1215, "lon": -115.1739,
+         "description": "Famous 4.2-mile stretch of Las Vegas Boulevard", "photo": None, "day": None, "completed": False},
+        {"id": 4, "name": "Grand Canyon National Park", "type": "attraction", "lat": 36.1069, "lon": -112.1129,
+         "description": "One of the world's most spectacular natural wonders", "photo": None, "day": None, "completed": False},
+        {"id": 5, "name": "San Diego Zoo", "type": "attraction", "lat": 32.7353, "lon": -117.1490,
+         "description": "World-famous zoo with over 3,700 animals", "photo": None, "day": None, "completed": False},
+        {"id": 6, "name": "Palm Springs Aerial Tramway", "type": "attraction", "lat": 33.8153, "lon": -116.6200,
+         "description": "Scenic tramway to Mount San Jacinto", "photo": None, "day": None, "completed": False},
+    ]
+}
+DEFAULT_TRIP_INFO = {"flights": [], "hotels": []}
+DEFAULT_TODO = {"items": []}
+DEFAULT_USERS = {"users": ["Piotr", "Weronika", "Magda", "Marek", "Przemek"]}
+DEFAULT_BUDGET = {"expenses": []}
+DEFAULT_NOTES = {"notes": []}
+
+
+# Initialize default data (files if local, database if Supabase configured)
 def init_default_data():
-    """Initialize default data files if they don't exist"""
-    
-    # Default places (attractions and restaurants)
+    """Initialize default data: use DB when configured, else local files."""
+    if use_database():
+        if db_load("places") is None:
+            db_save("places", DEFAULT_PLACES)
+        if db_load("trip_info") is None:
+            db_save("trip_info", DEFAULT_TRIP_INFO)
+        if db_load("todo") is None:
+            db_save("todo", DEFAULT_TODO)
+        if db_load("users") is None:
+            db_save("users", DEFAULT_USERS)
+        if db_load("packing") is None:
+            users_data = load_users()
+            default_packing = {user: [] for user in users_data.get("users", [])}
+            db_save("packing", default_packing)
+        if db_load("budget") is None:
+            db_save("budget", DEFAULT_BUDGET)
+        if db_load("notes") is None:
+            db_save("notes", DEFAULT_NOTES)
+        return
+
+    # File-based defaults
     if not os.path.exists(PLACES_FILE):
-        default_places = {
-            "places": [
-                {
-                    "id": 1,
-                    "name": "Hollywood Walk of Fame",
-                    "type": "attraction",
-                    "lat": 34.1016,
-                    "lon": -118.3269,
-                    "description": "Famous sidewalk with stars honoring celebrities",
-                    "photo": None,
-                    "day": None,
-                    "completed": False
-                },
-                {
-                    "id": 2,
-                    "name": "Griffith Observatory",
-                    "type": "attraction",
-                    "lat": 34.1183,
-                    "lon": -118.3003,
-                    "description": "Iconic observatory with stunning views of LA",
-                    "photo": None,
-                    "day": None,
-                    "completed": False
-                },
-                {
-                    "id": 3,
-                    "name": "Las Vegas Strip",
-                    "type": "attraction",
-                    "lat": 36.1215,
-                    "lon": -115.1739,
-                    "description": "Famous 4.2-mile stretch of Las Vegas Boulevard",
-                    "photo": None,
-                    "day": None,
-                    "completed": False
-                },
-                {
-                    "id": 4,
-                    "name": "Grand Canyon National Park",
-                    "type": "attraction",
-                    "lat": 36.1069,
-                    "lon": -112.1129,
-                    "description": "One of the world's most spectacular natural wonders",
-                    "photo": None,
-                    "day": None,
-                    "completed": False
-                },
-                {
-                    "id": 5,
-                    "name": "San Diego Zoo",
-                    "type": "attraction",
-                    "lat": 32.7353,
-                    "lon": -117.1490,
-                    "description": "World-famous zoo with over 3,700 animals",
-                    "photo": None,
-                    "day": None,
-                    "completed": False
-                },
-                {
-                    "id": 6,
-                    "name": "Palm Springs Aerial Tramway",
-                    "type": "attraction",
-                    "lat": 33.8153,
-                    "lon": -116.6200,
-                    "description": "Scenic tramway to Mount San Jacinto",
-                    "photo": None,
-                    "day": None,
-                    "completed": False
-                }
-            ]
-        }
         with open(PLACES_FILE, 'w') as f:
-            json.dump(default_places, f, indent=2)
-    
-    # Default trip info
+            json.dump(DEFAULT_PLACES, f, indent=2)
     if not os.path.exists(TRIP_INFO_FILE):
-        default_trip_info = {
-            "flights": [],
-            "hotels": []
-        }
         with open(TRIP_INFO_FILE, 'w') as f:
-            json.dump(default_trip_info, f, indent=2)
-    
-    # Default todo list
+            json.dump(DEFAULT_TRIP_INFO, f, indent=2)
     if not os.path.exists(TODO_FILE):
-        default_todo = {"items": []}
         with open(TODO_FILE, 'w') as f:
-            json.dump(default_todo, f, indent=2)
-    
-    # Default users list
+            json.dump(DEFAULT_TODO, f, indent=2)
     if not os.path.exists(USERS_FILE):
-        default_users = ["Piotr", "Weronika", "Magda", "Marek", "Przemek"]
         with open(USERS_FILE, 'w') as f:
-            json.dump({"users": default_users}, f, indent=2)
-    
-    # Default packing lists (will be initialized based on users)
+            json.dump(DEFAULT_USERS, f, indent=2)
     if not os.path.exists(PACKING_FILE):
         users_data = load_users()
         default_packing = {user: [] for user in users_data.get("users", [])}
         with open(PACKING_FILE, 'w') as f:
             json.dump(default_packing, f, indent=2)
-    
-    # Default budget
     if not os.path.exists(BUDGET_FILE):
-        default_budget = {
-            "expenses": []
-        }
         with open(BUDGET_FILE, 'w') as f:
-            json.dump(default_budget, f, indent=2)
-    
-    # Default notes
+            json.dump(DEFAULT_BUDGET, f, indent=2)
     if not os.path.exists(NOTES_FILE):
-        default_notes = {"notes": []}
         with open(NOTES_FILE, 'w') as f:
-            json.dump(default_notes, f, indent=2)
+            json.dump(DEFAULT_NOTES, f, indent=2)
 
-# Load data functions
+# Load data functions (use database when Supabase is configured, else local files)
 def load_places():
+    if use_database():
+        data = db_load("places")
+        if data is not None:
+            return data
     if os.path.exists(PLACES_FILE):
         with open(PLACES_FILE, 'r') as f:
             return json.load(f)
     return {"places": []}
 
 def save_places(data):
+    if use_database() and db_save("places", data):
+        return
     with open(PLACES_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_todo():
+    if use_database():
+        data = db_load("todo")
+        if data is not None:
+            return data
     if os.path.exists(TODO_FILE):
         with open(TODO_FILE, 'r') as f:
             return json.load(f)
     return {"items": []}
 
 def save_todo(data):
+    if use_database() and db_save("todo", data):
+        return
     with open(TODO_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_trip_info():
+    if use_database():
+        data = db_load("trip_info")
+        if data is not None:
+            return data
     if os.path.exists(TRIP_INFO_FILE):
         with open(TRIP_INFO_FILE, 'r') as f:
             return json.load(f)
     return {"flights": {}, "hotels": []}
 
 def save_trip_info(data):
+    if use_database() and db_save("trip_info", data):
+        return
     with open(TRIP_INFO_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_packing():
+    if use_database():
+        data = db_load("packing")
+        if data is not None:
+            return data
     if os.path.exists(PACKING_FILE):
         with open(PACKING_FILE, 'r') as f:
             return json.load(f)
     return {"Piotr": [], "Weronika": [], "Magda": [], "Marek": [], "Przemek": []}
 
 def save_packing(data):
+    if use_database() and db_save("packing", data):
+        return
     with open(PACKING_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_budget():
+    if use_database():
+        data = db_load("budget")
+        if data is not None:
+            return data
     if os.path.exists(BUDGET_FILE):
         with open(BUDGET_FILE, 'r') as f:
             return json.load(f)
     return {"expenses": []}
 
 def save_budget(data):
+    if use_database() and db_save("budget", data):
+        return
     with open(BUDGET_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_notes():
+    if use_database():
+        data = db_load("notes")
+        if data is not None:
+            return data
     if os.path.exists(NOTES_FILE):
         with open(NOTES_FILE, 'r') as f:
             return json.load(f)
     return {"notes": []}
 
 def save_notes(data):
+    if use_database() and db_save("notes", data):
+        return
     with open(NOTES_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_users():
+    if use_database():
+        data = db_load("users")
+        if data is not None:
+            return data
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r') as f:
             return json.load(f)
     return {"users": []}
 
 def save_users(data):
+    if use_database() and db_save("users", data):
+        return
     with open(USERS_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_weather():
+    if use_database():
+        data = db_load("weather")
+        if data is not None:
+            return data
     if os.path.exists(WEATHER_FILE):
         with open(WEATHER_FILE, 'r') as f:
             return json.load(f)
     return {"forecasts": []}
 
 def save_weather(data):
+    if use_database() and db_save("weather", data):
+        return
     with open(WEATHER_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 def load_exchange_rates():
     """Load cached exchange rates"""
+    if use_database():
+        data = db_load("exchange_rates")
+        if data is not None:
+            return data
     if os.path.exists(EXCHANGE_RATE_FILE):
         with open(EXCHANGE_RATE_FILE, 'r') as f:
             return json.load(f)
@@ -307,6 +324,8 @@ def load_exchange_rates():
 
 def save_exchange_rates(data):
     """Save exchange rates cache"""
+    if use_database() and db_save("exchange_rates", data):
+        return
     with open(EXCHANGE_RATE_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
@@ -693,31 +712,59 @@ def estimate_travel_time(distance_miles, mode="driving"):
     hours = distance_miles / avg_speed
     return hours
 
-# Photo helper functions
+# Photo helper functions (support DB storage when use_database())
 def save_photo(uploaded_file, place_id):
-    """Save uploaded photo and return the file path"""
-    if uploaded_file is not None:
-        # Get file extension
+    """Save uploaded photo and return the file path (or db:place_id when using DB)."""
+    if uploaded_file is None:
+        return None
+    if use_database():
         file_ext = os.path.splitext(uploaded_file.name)[1]
-        photo_path = os.path.join(PHOTOS_DIR, f"place_{place_id}{file_ext}")
-        
-        # Save the file
-        with open(photo_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        return photo_path
-    return None
+        b64 = base64.b64encode(uploaded_file.getbuffer().read()).decode()
+        if db_save_photo(place_id, f"place_{place_id}{file_ext}", b64):
+            return f"db:{place_id}"
+        return None
+    file_ext = os.path.splitext(uploaded_file.name)[1]
+    photo_path = os.path.join(PHOTOS_DIR, f"place_{place_id}{file_ext}")
+    with open(photo_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return photo_path
+
 
 def get_photo_base64(photo_path):
-    """Convert photo to base64 for HTML display"""
-    if photo_path and os.path.exists(photo_path):
+    """Convert photo to base64 for HTML display (supports db:place_id)."""
+    if not photo_path:
+        return None
+    if photo_path.startswith("db:"):
+        try:
+            place_id = photo_path.replace("db:", "", 1)
+            row = db_load_photo(place_id)
+            if row and isinstance(row.get("data"), str):
+                return row["data"]
+        except Exception:
+            pass
+        return None
+    if os.path.exists(photo_path):
         with open(photo_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode()
     return None
 
+
 def display_photo_in_streamlit(photo_path):
-    """Display photo in Streamlit"""
-    if photo_path and os.path.exists(photo_path):
+    """Display photo in Streamlit (supports db:place_id)."""
+    if not photo_path:
+        return
+    if photo_path.startswith("db:"):
+        try:
+            place_id = photo_path.replace("db:", "", 1)
+            row = db_load_photo(place_id)
+            if row and isinstance(row.get("data"), str):
+                img_bytes = base64.b64decode(row["data"])
+                img = Image.open(io.BytesIO(img_bytes))
+                st.image(img, width=300)
+        except Exception:
+            pass
+        return
+    if os.path.exists(photo_path):
         img = Image.open(photo_path)
         st.image(img, width=300)
 

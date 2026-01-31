@@ -122,18 +122,12 @@ streamlit run app.py
 
 ## 📁 Data Storage
 
-The app stores all data in JSON files in the `data/` directory:
-- `places.json` - Map locations, attractions, and restaurants
-- `todo.json` - To-do list items
-- `trip_info.json` - Flight and hotel information
-- `packing.json` - Packing lists for each person
-- `budget.json` - Budget and expense tracking
-- `notes.json` - Trip notes
-- `users.json` - User list
-- `weather.json` - Weather forecast data (cached)
-- `photos/` - Uploaded photos for places
+**Local (no database):** The app stores data in JSON files in the `data/` directory (places, todo, trip info, packing, budget, notes, users, weather cache, photos).
 
-**Note:** For Streamlit Community Cloud, these files will persist during your session. For permanent storage across deployments, consider using a database or cloud storage service.
+**Streamlit Cloud:** When the app is idle, Streamlit may shut it down and **local file data is lost**. To keep your trip data across restarts, use the **Supabase database**:
+
+- See **[DATABASE_SETUP.md](DATABASE_SETUP.md)** for step-by-step instructions to create a free Supabase project and connect it to the app.
+- Once `SUPABASE_URL` and `SUPABASE_KEY` are set in Streamlit secrets, all data (including place photos) is stored in the database and restored when the app runs again.
 
 ## 💡 Usage Tips
 

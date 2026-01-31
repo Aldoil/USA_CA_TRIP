@@ -73,7 +73,7 @@ The app will be live at: `https://YOUR_APP_NAME.streamlit.app`
 
 **Issue**: Data not saving
 - Make sure the `data/` directory exists and is writable
-- On Streamlit Cloud, data persists during your session
+- On Streamlit Cloud, **data is lost when the app sleeps**. To keep data across restarts, set up the **Supabase database** – see **[DATABASE_SETUP.md](DATABASE_SETUP.md)** for step-by-step instructions.
 
 **Issue**: App won't run
 - Check Python version (requires Python 3.7+)
