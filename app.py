@@ -182,8 +182,8 @@ def init_default_data():
         with open(NOTES_FILE, 'w') as f:
             json.dump(DEFAULT_NOTES, f, indent=2)
 
-# Load data functions (use database when Supabase is configured, else local files)
-def load_places():
+# --- Storage layer: read/write DB or file (used on first load and on "Save all") ---
+def _load_places_from_storage():
     if use_database():
         data = db_load("places")
         if data is not None:
@@ -193,13 +193,13 @@ def load_places():
             return json.load(f)
     return {"places": []}
 
-def save_places(data):
+def _save_places_to_storage(data):
     if use_database() and db_save("places", data):
         return
     with open(PLACES_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_todo():
+def _load_todo_from_storage():
     if use_database():
         data = db_load("todo")
         if data is not None:
@@ -209,13 +209,13 @@ def load_todo():
             return json.load(f)
     return {"items": []}
 
-def save_todo(data):
+def _save_todo_to_storage(data):
     if use_database() and db_save("todo", data):
         return
     with open(TODO_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_trip_info():
+def _load_trip_info_from_storage():
     if use_database():
         data = db_load("trip_info")
         if data is not None:
@@ -225,13 +225,13 @@ def load_trip_info():
             return json.load(f)
     return {"flights": {}, "hotels": []}
 
-def save_trip_info(data):
+def _save_trip_info_to_storage(data):
     if use_database() and db_save("trip_info", data):
         return
     with open(TRIP_INFO_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_packing():
+def _load_packing_from_storage():
     if use_database():
         data = db_load("packing")
         if data is not None:
@@ -241,13 +241,13 @@ def load_packing():
             return json.load(f)
     return {"Piotr": [], "Weronika": [], "Magda": [], "Marek": [], "Przemek": []}
 
-def save_packing(data):
+def _save_packing_to_storage(data):
     if use_database() and db_save("packing", data):
         return
     with open(PACKING_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_budget():
+def _load_budget_from_storage():
     if use_database():
         data = db_load("budget")
         if data is not None:
@@ -257,13 +257,13 @@ def load_budget():
             return json.load(f)
     return {"expenses": []}
 
-def save_budget(data):
+def _save_budget_to_storage(data):
     if use_database() and db_save("budget", data):
         return
     with open(BUDGET_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_notes():
+def _load_notes_from_storage():
     if use_database():
         data = db_load("notes")
         if data is not None:
@@ -273,13 +273,13 @@ def load_notes():
             return json.load(f)
     return {"notes": []}
 
-def save_notes(data):
+def _save_notes_to_storage(data):
     if use_database() and db_save("notes", data):
         return
     with open(NOTES_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_users():
+def _load_users_from_storage():
     if use_database():
         data = db_load("users")
         if data is not None:
@@ -289,13 +289,13 @@ def load_users():
             return json.load(f)
     return {"users": []}
 
-def save_users(data):
+def _save_users_to_storage(data):
     if use_database() and db_save("users", data):
         return
     with open(USERS_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_weather():
+def _load_weather_from_storage():
     if use_database():
         data = db_load("weather")
         if data is not None:
@@ -305,14 +305,13 @@ def load_weather():
             return json.load(f)
     return {"forecasts": []}
 
-def save_weather(data):
+def _save_weather_to_storage(data):
     if use_database() and db_save("weather", data):
         return
     with open(WEATHER_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_exchange_rates():
-    """Load cached exchange rates"""
+def _load_exchange_rates_from_storage():
     if use_database():
         data = db_load("exchange_rates")
         if data is not None:
@@ -322,12 +321,112 @@ def load_exchange_rates():
             return json.load(f)
     return {}
 
-def save_exchange_rates(data):
-    """Save exchange rates cache"""
+def _save_exchange_rates_to_storage(data):
     if use_database() and db_save("exchange_rates", data):
         return
     with open(EXCHANGE_RATE_FILE, 'w') as f:
         json.dump(data, f, indent=2)
+
+# --- App-facing load/save: use session_state; mark dirty (persist only on "Save all") ---
+def load_places():
+    if "places" not in st.session_state:
+        st.session_state["places"] = _load_places_from_storage()
+    return st.session_state["places"]
+
+def save_places(data):
+    st.session_state["places"] = data
+    st.session_state["dirty_places"] = True
+
+def load_todo():
+    if "todo" not in st.session_state:
+        st.session_state["todo"] = _load_todo_from_storage()
+    return st.session_state["todo"]
+
+def save_todo(data):
+    st.session_state["todo"] = data
+    st.session_state["dirty_todo"] = True
+
+def load_trip_info():
+    if "trip_info" not in st.session_state:
+        st.session_state["trip_info"] = _load_trip_info_from_storage()
+    return st.session_state["trip_info"]
+
+def save_trip_info(data):
+    st.session_state["trip_info"] = data
+    st.session_state["dirty_trip_info"] = True
+
+def load_packing():
+    if "packing" not in st.session_state:
+        st.session_state["packing"] = _load_packing_from_storage()
+    return st.session_state["packing"]
+
+def save_packing(data):
+    st.session_state["packing"] = data
+    st.session_state["dirty_packing"] = True
+
+def load_budget():
+    if "budget" not in st.session_state:
+        st.session_state["budget"] = _load_budget_from_storage()
+    return st.session_state["budget"]
+
+def save_budget(data):
+    st.session_state["budget"] = data
+    st.session_state["dirty_budget"] = True
+
+def load_notes():
+    if "notes" not in st.session_state:
+        st.session_state["notes"] = _load_notes_from_storage()
+    return st.session_state["notes"]
+
+def save_notes(data):
+    st.session_state["notes"] = data
+    st.session_state["dirty_notes"] = True
+
+def load_users():
+    if "users" not in st.session_state:
+        st.session_state["users"] = _load_users_from_storage()
+    return st.session_state["users"]
+
+def save_users(data):
+    st.session_state["users"] = data
+    st.session_state["dirty_users"] = True
+
+def load_weather():
+    if "weather" not in st.session_state:
+        st.session_state["weather"] = _load_weather_from_storage()
+    return st.session_state["weather"]
+
+def save_weather(data):
+    st.session_state["weather"] = data
+    st.session_state["dirty_weather"] = True
+
+def load_exchange_rates():
+    if "exchange_rates" not in st.session_state:
+        st.session_state["exchange_rates"] = _load_exchange_rates_from_storage()
+    return st.session_state["exchange_rates"]
+
+def save_exchange_rates(data):
+    st.session_state["exchange_rates"] = data
+    st.session_state["dirty_exchange_rates"] = True
+
+def flush_all_to_storage():
+    """Write all dirty data to DB/file. Called when user clicks Save all."""
+    dirty_keys = [
+        ("places", _save_places_to_storage),
+        ("todo", _save_todo_to_storage),
+        ("trip_info", _save_trip_info_to_storage),
+        ("packing", _save_packing_to_storage),
+        ("budget", _save_budget_to_storage),
+        ("notes", _save_notes_to_storage),
+        ("users", _save_users_to_storage),
+        ("weather", _save_weather_to_storage),
+        ("exchange_rates", _save_exchange_rates_to_storage),
+    ]
+    for key, save_fn in dirty_keys:
+        if st.session_state.get(f"dirty_{key}"):
+            save_fn(st.session_state[key])
+            if f"dirty_{key}" in st.session_state:
+                del st.session_state[f"dirty_{key}"]
 
 def get_usd_to_pln_rate(date_str=None):
     """Get USD to PLN exchange rate from free API (exchangerate.host)"""
@@ -874,6 +973,9 @@ TRANSLATIONS = {
         "room_info": "Room Info (e.g., 2 rooms, 4 people)",
         "no_hotels": "No hotels added yet. Add your first hotel above!",
         "edit_hotel": "Edit Hotel",
+        "save_all_changes": "Save all changes to database",
+        "save_all_changes_success": "All changes saved.",
+        "no_unsaved_changes": "No unsaved changes.",
         # Before Trip
         "before_trip_header": "🎒 Before Trip Checklist",
         "manage_packing": "Manage packing lists for each traveler",
@@ -1096,6 +1198,9 @@ TRANSLATIONS = {
         "room_info": "Informacje o Pokoju (np. 2 pokoje, 4 osoby)",
         "no_hotels": "Nie dodano jeszcze hoteli. Dodaj pierwszy hotel powyzej!",
         "edit_hotel": "Edytuj Hotel",
+        "save_all_changes": "Zapisz wszystkie zmiany do bazy",
+        "save_all_changes_success": "Wszystkie zmiany zapisane.",
+        "no_unsaved_changes": "Brak niezapisanych zmian.",
         # Before Trip
         "before_trip_header": "🎒 Lista Przed Podroza",
         "manage_packing": "Zarzadzaj listami pakowania dla kazdego podroznika",
@@ -1258,6 +1363,17 @@ def main():
         t("choose_page", lang),
         [t("users", lang), t("map", lang), t("todo", lang), t("trip_info", lang), t("before_trip", lang), t("budget", lang), t("weather", lang), t("notes", lang)]
     )
+
+    # Save all changes to database (below nav)
+    dirty_keys = ["places", "todo", "trip_info", "packing", "budget", "notes", "users", "weather", "exchange_rates"]
+    has_unsaved = any(st.session_state.get(f"dirty_{k}") for k in dirty_keys)
+    if has_unsaved:
+        if st.sidebar.button(t("save_all_changes", lang), type="primary", use_container_width=True):
+            flush_all_to_storage()
+            st.sidebar.success(t("save_all_changes_success", lang))
+            st.rerun()
+    else:
+        st.sidebar.caption(t("no_unsaved_changes", lang))
     
     # Get current language
     lang = st.session_state.language
