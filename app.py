@@ -873,6 +873,7 @@ TRANSLATIONS = {
         "confirmation": "Confirmation Number",
         "room_info": "Room Info (e.g., 2 rooms, 4 people)",
         "no_hotels": "No hotels added yet. Add your first hotel above!",
+        "edit_hotel": "Edit Hotel",
         # Before Trip
         "before_trip_header": "🎒 Before Trip Checklist",
         "manage_packing": "Manage packing lists for each traveler",
@@ -1094,6 +1095,7 @@ TRANSLATIONS = {
         "confirmation": "Numer Potwierdzenia",
         "room_info": "Informacje o Pokoju (np. 2 pokoje, 4 osoby)",
         "no_hotels": "Nie dodano jeszcze hoteli. Dodaj pierwszy hotel powyzej!",
+        "edit_hotel": "Edytuj Hotel",
         # Before Trip
         "before_trip_header": "🎒 Lista Przed Podroza",
         "manage_packing": "Zarzadzaj listami pakowania dla kazdego podroznika",
@@ -2036,20 +2038,78 @@ def show_trip_info(lang="en"):
     # Display hotels
     if hotels:
         for hotel in hotels:
+            edit_key = f"edit_hotel_{hotel['id']}"
+            is_editing = st.session_state.get(edit_key, False)
+
             with st.expander(f"🏨 {hotel['name']} - {hotel.get('location', 'N/A')}"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write(f"**{t('check_in', lang)}:** {hotel.get('check_in', 'N/A')}")
-                    st.write(f"**{t('check_out', lang)}:** {hotel.get('check_out', 'N/A')}")
-                with col2:
-                    st.write(f"**{t('confirmation', lang)}:** {hotel.get('confirmation', 'N/A')}")
-                    st.write(f"**{t('room_info', lang).split('(')[0].strip()}:** {hotel.get('room_info', 'N/A')}")
-                
-                if st.button(f"{t('delete', lang)} {hotel['name']}", key=f"del_hotel_{hotel['id']}"):
-                    hotels.remove(hotel)
-                    trip_info["hotels"] = hotels
-                    save_trip_info(trip_info)
-                    st.rerun()
+                if is_editing:
+                    # Edit hotel form
+                    with st.form(f"edit_hotel_form_{hotel['id']}"):
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            hotel_name = st.text_input(t("hotel_name", lang), value=hotel.get("name", ""), key=f"edit_hotel_name_{hotel['id']}")
+                            check_in_default = datetime.now().date()
+                            if hotel.get("check_in"):
+                                try:
+                                    check_in_default = datetime.strptime(hotel["check_in"], "%Y-%m-%d").date()
+                                except Exception:
+                                    pass
+                            check_in = st.date_input(t("check_in", lang), value=check_in_default, key=f"edit_hotel_ci_{hotel['id']}")
+                        with col2:
+                            hotel_location = st.text_input(t("location", lang), value=hotel.get("location", ""), key=f"edit_hotel_loc_{hotel['id']}")
+                            check_out_default = datetime.now().date()
+                            if hotel.get("check_out"):
+                                try:
+                                    check_out_default = datetime.strptime(hotel["check_out"], "%Y-%m-%d").date()
+                                except Exception:
+                                    pass
+                            check_out = st.date_input(t("check_out", lang), value=check_out_default, key=f"edit_hotel_co_{hotel['id']}")
+                        with col3:
+                            confirmation_num = st.text_input(t("confirmation", lang), value=hotel.get("confirmation", ""), key=f"edit_hotel_conf_{hotel['id']}")
+                            room_info = st.text_input(t("room_info", lang), value=hotel.get("room_info", ""), key=f"edit_hotel_room_{hotel['id']}")
+
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            if st.form_submit_button(t("save_changes", lang)):
+                                if hotel_name:
+                                    hotel.update({
+                                        "name": hotel_name,
+                                        "location": hotel_location,
+                                        "check_in": check_in.strftime("%Y-%m-%d"),
+                                        "check_out": check_out.strftime("%Y-%m-%d"),
+                                        "confirmation": confirmation_num,
+                                        "room_info": room_info
+                                    })
+                                    trip_info["hotels"] = hotels
+                                    save_trip_info(trip_info)
+                                    st.session_state[edit_key] = False
+                                    st.success(t("save_changes", lang) + "!")
+                                    st.rerun()
+                        with col_btn2:
+                            if st.form_submit_button(t("cancel", lang)):
+                                st.session_state[edit_key] = False
+                                st.rerun()
+                else:
+                    # Display mode
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**{t('check_in', lang)}:** {hotel.get('check_in', 'N/A')}")
+                        st.write(f"**{t('check_out', lang)}:** {hotel.get('check_out', 'N/A')}")
+                    with col2:
+                        st.write(f"**{t('confirmation', lang)}:** {hotel.get('confirmation', 'N/A')}")
+                        st.write(f"**{t('room_info', lang).split('(')[0].strip()}:** {hotel.get('room_info', 'N/A')}")
+
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button(t("edit_hotel", lang), key=f"btn_edit_hotel_{hotel['id']}"):
+                            st.session_state[edit_key] = True
+                            st.rerun()
+                    with col_btn2:
+                        if st.button(f"{t('delete', lang)} {hotel['name']}", key=f"del_hotel_{hotel['id']}"):
+                            hotels.remove(hotel)
+                            trip_info["hotels"] = hotels
+                            save_trip_info(trip_info)
+                            st.rerun()
     else:
         st.info(t("no_hotels", lang))
 

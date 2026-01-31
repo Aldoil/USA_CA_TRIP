@@ -118,6 +118,59 @@ SUPABASE_KEY = "your_anon_public_key_here"
 
 ---
 
+## How updates work: saving and reacting to changes
+
+### Where data lives in the database
+
+The app uses **one table**, `app_data`, with two columns:
+
+| Column | Type   | Meaning                                      |
+|--------|--------|----------------------------------------------|
+| `key`  | text   | Identifier: `"trip_info"`, `"places"`, etc.  |
+| `value`| jsonb  | The whole JSON for that key (e.g. all hotels, all places) |
+
+So there is **one row per “data type”**, not one row per hotel or per place. For example:
+
+- Row `key = "trip_info"` → `value = { "flights": [...], "hotels": [...] }`
+- Row `key = "places"` → `value = { "places": [...] }`
+
+### What happens when you change something (e.g. edit a hotel)
+
+1. **In the app (UI)**  
+   You edit a hotel and click “Save Changes”. The app updates the in-memory `trip_info` object (the `hotels` list inside it).
+
+2. **Save call**  
+   The app calls `save_trip_info(trip_info)` with that **entire** object (all flights + all hotels).
+
+3. **Inside `save_trip_info`**  
+   - If the database is configured: it calls `db_save("trip_info", data)`.  
+   - If not: it writes `trip_info.json` to disk.
+
+4. **Inside `db_save`**  
+   It sends one row to Supabase:  
+   `{ "key": "trip_info", "value": <whole trip_info object> }`  
+   and runs an **upsert** on `app_data` with `on_conflict="key"`. So:
+   - If a row with `key = "trip_info"` already exists → that row’s `value` is **replaced** with the new JSON.
+   - If it doesn’t exist → a new row is **inserted**.
+
+So every time you save (edit hotel, add flight, delete place, etc.), the app **overwrites the whole blob** for that key. The database does not “patch” individual hotels or flights; it just stores the latest full JSON.
+
+### What happens when the app loads (e.g. after restart)
+
+1. The app calls e.g. `load_trip_info()`.
+2. If the database is configured, that calls `db_load("trip_info")`, which runs:  
+   `SELECT value FROM app_data WHERE key = 'trip_info'`  
+   and returns the **one** jsonb value for that key.
+3. The app uses that object as its in-memory `trip_info` (flights + hotels). So the next time you open Trip Info, you see the last saved state.
+
+### Summary
+
+- **Saving** = replace the whole value for that key in `app_data` (upsert by `key`).
+- **Loading** = read the value for that key from `app_data` and use it in the app.
+- **Reacting to changes** = the app does not “subscribe” to the database. Each user sees changes only after a reload/rerun that calls `load_*` again. So: you edit → save (writes to DB) → the same session reruns and reads from DB (or from memory), so you see the update. Another user or another device will see the update the next time the app loads data (e.g. when they open the app or refresh).
+
+---
+
 ## Troubleshooting
 
 - **“relation app_data does not exist”**  
